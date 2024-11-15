@@ -3,23 +3,46 @@ import { Image, SafeAreaView, Text, TextInput, TouchableOpacity, View } from 're
 import "./global.css";
 import { CalendarDaysIcon, MagnifyingGlassIcon } from 'react-native-heroicons/outline';
 import { MapPinIcon } from 'react-native-heroicons/solid';
-import { useCallback, useState } from 'react';
-import { ScrollView } from 'react-native-reanimated/lib/typescript/Animated';
+import { useCallback, useEffect, useState } from 'react';
+import { ScrollView } from 'react-native';
 import { debounce } from 'lodash';
+import { fetchLocations, fetchWeatherForecast } from './api/weather';
+import { weatherImages } from './constants';
 
 export default function App() {
   const [showSearch, setShowSearch] = useState(false);
-  const [locations, setLocations] = useState([1,2,3]);
+  const [locations, setLocations] = useState([]);
+  const [weather, setWeather] = useState({});
 
   const handleLocation = (loc) => {
     console.log('location: ', loc);
+    setLocations([]);
+    fetchWeatherForecast({ cityName: loc.name, days: '7' }).then(data => {
+      setWeather(data);
+    })
   };
 
-  const handleSearch = value => {
-    console.log(value);
+  const handleSearch = (value) => {
+    if(value.length > 2) {
+      fetchLocations({cityName: value}).then(data => {
+        setLocations(data);
+      })
+    }
+  };
+
+  useEffect(() => {
+    fetchWeatherData();
+  }, []);
+
+  const fetchWeatherData = async () => {
+    fetchWeatherForecast({ cityName: 'London', days: '7' }).then(data => {
+      setWeather(data);
+    })
   };
 
   const handleTextDebounce = useCallback(debounce(handleSearch, 1200), []);
+
+  const {current, location} = weather;
 
   return (
     <View className='flex-1 relative'>
@@ -31,7 +54,7 @@ export default function App() {
         {/* Search Section */}
         <View style={{height: '8%'}} className='mt-14 mx-4 relative z-50'>
           <View className={`flex-row justify-end items-center rounded-full ${showSearch ? 'bg-gray-600' : 'bg-transparent'}`}>
-            {showSearch ? (<TextInput onChange={handleTextDebounce} placeholder='Search city' placeholderTextColor={'lightgray'} className='pl-6 h-10 flex-1 text-base text-white' />) : null}
+            {showSearch ? (<TextInput onChangeText={handleTextDebounce} placeholder='Search city' placeholderTextColor={'lightgray'} className='pl-6 h-10 flex-1 text-base text-white' />) : null}
 
             <TouchableOpacity onPress={() => setShowSearch(!showSearch)} className='bg-gray-500 rounded-full p-3 m-1'>
               <MagnifyingGlassIcon size={25} color={"white"} />
@@ -41,14 +64,14 @@ export default function App() {
           {locations.length > 0 && showSearch ? (
             <View className='absolute w-full bg-gray-300 top-16 rounded-3xl'>
               {locations.map((loc, index) => {
-                let showBorder = index+1 !== locations.length;
+                let showBorder = index + 1 !== locations.length;
                 let borderClass = showBorder ? 'border-b-2 border-b-gray-400' : '';
                 return (
-                  <TouchableOpacity onPress={() => handleLocation(loc)} key={index} className={"flex-row items-center border-0 p-3 px-4 mb-1" + borderClass}>
+                  <TouchableOpacity onPress={() => handleLocation(loc)} key={index} className={`flex-row items-center border-0 p-3 px-4 mb-1 ${borderClass}`} >
                     <MapPinIcon size={20} color={"gray"} />
-                    <Text className='text-black text-lg ml-2'>London</Text>
+                    <Text className='text-black text-lg ml-2'>{loc?.name}, {loc?.country}</Text>
                   </TouchableOpacity>
-                )
+                );
               })}
             </View>
           ) : null}
@@ -58,25 +81,25 @@ export default function App() {
         <View className='mx-4 flex justify-around flex-1 mb-2'>
           {/* Location */}
           <Text className='text-white text-center text-2xl font-bold'>
-            London,
+            {location?.name},
             <Text className='text-lg font-semibold text-gray-300'>
-              United Kingdom
+              {" " + location?.country}
             </Text>
           </Text>
 
           {/* Weather Image */}
           <View className='flex-row justify-center'>
-            <Image source={require('./assets/cloud.png')} className='w-52 h-52' />
+            <Image source={weatherImages[current?.condition?.text]} className='w-52 h-52' />
           </View>
 
           {/* Degree Celcius */}
           <View className='space-y-2'>
             <Text className='text-center font-bold text-white text-6xl ml-5'>
-              23&#176;
+              {current?.temp_c}&#176;
             </Text>
 
             <Text className='text-center text-white text-xl tracking-widest'>
-              Partly Cloud
+              {current?.condition?.text}
             </Text>
           </View>
 
@@ -84,12 +107,12 @@ export default function App() {
           <View className='flex-row justify-between mx-4'>
             <View className='flex-row space-x-2 items-center'>
               <Image source={require('./assets/drizzle.png')} className='h-6 w-6' />
-              <Text className='text-white font-semibold text-base'>22km</Text>
+              <Text className='text-white font-semibold text-base'>{current?.wind_kph}km</Text>
             </View>
 
             <View className='flex-row space-x-2 items-center'>
               <Image source={require('./assets/rain.png')} className='h-6 w-6' />
-              <Text className='text-white font-semibold text-base'>23%</Text>
+              <Text className='text-white font-semibold text-base'>{current?.humidity}%</Text>
             </View>
 
             <View className='flex-row space-x-2 items-center'>
@@ -107,47 +130,15 @@ export default function App() {
           </View>
 
           <ScrollView horizontal contentContainerStyle={{paddingHorizontal: 15}} showsHorizontalScrollIndicator={false}>
-            <View className='flex justify-center items-center w-24 rounded-3xl py-3 space-y-1 mr-4 bg-gray-500'>
-              <Image source={require('./assets/rain.png')} className='h-11 w-11' />
-              <Text className='text-white'>Monday</Text>
-              <Text className='text-white text-xl font-semibold'>13&#176;</Text>
-            </View>
-
-            <View className='flex justify-center items-center w-24 rounded-3xl py-3 space-y-1 mr-4 bg-gray-500'>
-              <Image source={require('./assets/clear.png')} className='h-11 w-11' />
-              <Text className='text-white'>Tuesday</Text>
-              <Text className='text-white text-xl font-semibold'>13&#176;</Text>
-            </View>
-
-            <View className='flex justify-center items-center w-24 rounded-3xl py-3 space-y-1 mr-4 bg-gray-500'>
-              <Image source={require('./assets/snow.png')} className='h-11 w-11' />
-              <Text className='text-white'>Wednesday</Text>
-              <Text className='text-white text-xl font-semibold'>13&#176;</Text>
-            </View>
-
-            <View className='flex justify-center items-center w-24 rounded-3xl py-3 space-y-1 mr-4 bg-gray-500'>
-              <Image source={require('./assets/drizzle.png')} className='h-11 w-11' />
-              <Text className='text-white'>Thursday</Text>
-              <Text className='text-white text-xl font-semibold'>13&#176;</Text>
-            </View>
-
-            <View className='flex justify-center items-center w-24 rounded-3xl py-3 space-y-1 mr-4 bg-gray-500'>
-              <Image source={require('./assets/cloud.png')} className='h-11 w-11' />
-              <Text className='text-white'>Friday</Text>
-              <Text className='text-white text-xl font-semibold'>13&#176;</Text>
-            </View>
-
-            <View className='flex justify-center items-center w-24 rounded-3xl py-3 space-y-1 mr-4 bg-gray-500'>
-              <Image source={require('./assets/rain.png')} className='h-11 w-11' />
-              <Text className='text-white'>Saturday</Text>
-              <Text className='text-white text-xl font-semibold'>13&#176;</Text>
-            </View>
-
-            <View className='flex justify-center items-center w-24 rounded-3xl py-3 space-y-1 mr-4 bg-gray-500'>
-              <Image source={require('./assets/snow.png')} className='h-11 w-11' />
-              <Text className='text-white'>Sunday</Text>
-              <Text className='text-white text-xl font-semibold'>13&#176;</Text>
-            </View>
+            {weather?.forecast?.forecastday?.map((item, index) => {
+              return (
+                <View className='flex justify-center items-center w-24 rounded-3xl py-3 space-y-1 mr-4 bg-gray-500'>
+                  <Image source={weatherImages[item?.day?.condition?.text]} className='h-11 w-11' />
+                  <Text className='text-white'>{item?.date}</Text>
+                  <Text className='text-white text-xl font-semibold'>{item?.day?.avgtemp_c}&#176;</Text>
+                </View>
+              )
+            })}
           </ScrollView>
         </View>
       </SafeAreaView>
